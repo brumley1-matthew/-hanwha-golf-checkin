@@ -4,7 +4,16 @@ import {createClient} from '@supabase/supabase-js';
 import './style.css';
 const url=import.meta.env.VITE_SUPABASE_URL;
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const supabase=url&&key?createClient(url,key):null;
+const supabase = url && key
+  ? createClient(url, key, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'implicit'
+      }
+    })
+  : null;
 function App(){
  const [session,setSession]=useState(null),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[authError,setAuthError]=useState(''),[authBusy,setAuthBusy]=useState(false);
  const [approved,setApproved]=useState(false),[loading,setLoading]=useState(true),[teams,setTeams]=useState([]),[players,setPlayers]=useState([]),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[tab,setTab]=useState('check'),[busy,setBusy]=useState({}),[message,setMessage]=useState('');
