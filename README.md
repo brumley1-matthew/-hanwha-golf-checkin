@@ -1,65 +1,48 @@
-# Hanwha Power Golf Check-In
+# Hanwha Power Golf Check-In — setup
 
-Responsive website for the October 17, 2026 event, using existing `public.golf_teams` and `public.golf_players` tables.
+## 1. Secure the existing database
 
-## 1. Secure your Supabase project
+Run `schema.sql` in Supabase **SQL Editor**. It preserves all existing teams and golfers, replaces the three broad policies from the earlier instructions, and limits golfer updates to `checked_in` and `checked_in_at` columns. IMPORTANT: If you have created other permissive policies for these tables, inspect and remove them before launch; PostgreSQL permissive policies combine with OR.
 
-1. In Supabase SQL Editor, run `security.sql`. If its last statement says the table is already a member of publication `supabase_realtime`, that statement can be skipped; the security changes preceding it already committed.
-2. In **Authentication → Providers → Email**, enable Email/password sign-in. Turn **Allow new users to sign up** OFF (or disable public sign-ups in Authentication settings). Use the dashboard **Authentication → Users → Add user** to create each volunteer with a unique email and temporary password. Ask them to change passwords after first login; configure password recovery email/redirect settings as needed.
-3. Approve each volunteer after their account exists. Find their user UUID in **Authentication → Users**, then run in SQL Editor (replace the UUID):
+Add approved volunteers in the SQL Editor (change the email):
 
 ```sql
-INSERT INTO public.approved_volunteers (user_id, approved)
-VALUES ('REPLACE_WITH_VOLUNTEER_USER_UUID', true)
-ON CONFLICT (user_id) DO UPDATE SET approved = EXCLUDED.approved;
+insert into public.golf_volunteers (email)
+values ('you@yourcompany.com'), ('helper@yourcompany.com')
+on conflict (email) do nothing;
 ```
 
-To revoke access:
+To review policies:
 
 ```sql
-UPDATE public.approved_volunteers SET approved = false
-WHERE user_id = 'REPLACE_WITH_VOLUNTEER_USER_UUID';
+select tablename, policyname, roles, cmd from pg_policies
+where schemaname='public' and tablename in ('golf_teams','golf_players','golf_volunteers');
 ```
 
-**Important:** only project administrators should edit the approved_volunteers table. Do not grant browser users INSERT or UPDATE on it.
+## 2. Enable email sign-in
 
-## 2. Run locally
+Supabase Dashboard > Authentication > Providers > Email. Enable Email and email OTP / magic links. **Turn off "Allow new users to sign up"** to restrict account creation. Create each volunteer's account in Authentication > Users > Add user (send invite or create a confirmed account). The app uses `shouldCreateUser: false`, so an account must exist before sign-in. Supabase's default email sending limits may require configuring custom SMTP for more users.
 
-Install Node.js 20+ and run:
+## 3. Set up redirect URLs
 
-```bash
-npm install
-cp .env.example .env
-```
+In Authentication > URL Configuration, add your final website URL (for example `https://your-project.vercel.app`) to **Redirect URLs** and set **Site URL** to the same. During local testing, you may also add `http://localhost:8000` to redirect URLs.
 
-Fill `.env` with your **Supabase Project URL** and **publishable key** from Supabase → Project Settings → API Keys. Never put secret/service_role keys in the frontend.
+## 4. Connect the website
 
-```bash
-npm run dev
-```
+Copy `config.example.js` to `config.js`. In Supabase Dashboard > Project Settings > API Keys (or Connect), copy the **Project URL** and **publishable** key. Replace placeholders. Do not use the service_role or secret key. `config.js` is public browser configuration; security depends on RLS, not secrecy of this key.
 
-Open the URL printed by Vite, then log in with an approved volunteer account.
+## 5. Test locally
 
-## 3. Publish to Vercel
+From this directory run `python3 -m http.server 8000` and open `http://localhost:8000`. Email login requires the user to exist in Authentication and in `golf_volunteers`.
 
-1. Create a private GitHub repository, add the files from this project, and push it. Do **not** commit `.env`.
-2. Go to https://vercel.com/new → Import your repository.
-3. Framework preset: **Vite**. Build command: `npm run build`. Output directory: `dist`.
-4. Under **Environment Variables**, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` with the same values as your local `.env`.
-5. Deploy. Share the HTTPS URL only with approved volunteers.
-6. Test with two devices/accounts. Check in a golfer on one device and verify the other updates. Test Undo and CSV export. If realtime is blocked, refreshing the page retrieves saved attendance.
+## 6. Deploy on Vercel
 
-## 4. Before event day
+Create a private GitHub repository containing `index.html`, `config.js`, and `README.md` (and optionally `schema.sql`), then in Vercel click **Add New > Project > Import Git Repository**. Framework preset: **Other**; no build command; output directory: root. Deploy. Then configure the deployed URL in Supabase Authentication > URL Configuration and test the login link on a phone and a computer. **Avoid putting `schema.sql` in a public repository** if you want to minimize operational details being exposed.
 
-- Check that all 24 teams have 4 golfers and 96 golfer names are correct.
-- Create volunteer accounts and approve them before arriving at the course.
-- Test Wi-Fi/cellular connectivity, logins, concurrent check-ins, and CSV export.
-- Bring a printed roster as an offline fallback. This website needs internet access.
-- Avoid sharing passwords; each volunteer uses their own login.
+## 7. Event-day test
 
-## Notes
+Sign in on two devices using separate approved volunteer accounts. Check in one test golfer on device A and confirm device B updates. Undo the check-in. Confirm CSV export. Keep a paper backup in case the venue loses internet connectivity.
 
-- This application does not edit golfer names or team assignments. Those can be maintained by a Supabase administrator in Table Editor.
-- Approved volunteers can see the entire roster and modify check-in state, but cannot change golfer names or teams through the browser database role.
-- Database `checked_in_at` records a timestamp when checking in. Undo clears it.
-- A logged-in volunteer whose approval is revoked will lose database access on subsequent requests; existing on-screen data may remain visible until logout or refresh. Log out shared devices.
+### Limitations
+
+This starter app supports check-in and attendance export, not roster edits or team reassignment. It requires internet access. Realtime event subscriptions are backed by database RLS. Supabase free plan limits and default email rate limits apply. Team data is only reloaded when the roster is loaded, not on team-name edits (which are disabled in this app).
