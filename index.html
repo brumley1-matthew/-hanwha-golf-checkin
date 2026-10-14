@@ -23,4 +23,4 @@
  async function session(s){user=s?.user||null;$('login').classList.toggle('hide',!!user);$('app').classList.toggle('hide',!user);if(channel){await db.removeChannel(channel);channel=null}if(user){$('identity').textContent=user.email;await load();channel=db.channel('golf-attendance').on('postgres_changes',{event:'UPDATE',schema:'public',table:'golf_players'},()=>load()).subscribe()}else{players=[];teams=[];msg('Sign in to begin check-in.')}}
  db.auth.onAuthStateChange((_event,s)=>{setTimeout(()=>session(s),0)});const {data}=await db.auth.getSession();await session(data.session);
 })();
-</script></body></html>
+<script src="/config.js"></script>
