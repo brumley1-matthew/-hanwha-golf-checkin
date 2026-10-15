@@ -58,29 +58,31 @@ async function ta() {
     const saving = c.has("team-attendance:" + team.id);
     const pending = members.some(player => c.has("attendance:" + player.id));
     const complete = members.length > 0 && members.every(player => player.checked_in);
-    return `<button class="green" data-check-team="${team.id}" aria-label="Check In All for ${u(team.name)}" ${saving || pending || complete || !members.length ? "disabled" : ""}>${saving ? "Saving…" : complete ? "All checked in" : "Check In All"}</button>`;
+    return `<button class="${complete ? "" : "green"}" data-check-team="${team.id}" aria-label="${complete ? "Undo Check In All" : "Check In All"} for ${u(team.name)}" ${saving || pending || !members.length ? "disabled" : ""}>${saving ? "Saving…" : complete ? "Undo Check In All" : "Check In All"}</button>`;
   }
   async function checkInTeam(teamId) {
     const team = n.find(team => team.id === teamId);
     const members = s.filter(player => player.team_id === teamId);
     const key = "team-attendance:" + teamId;
-    if (!a || !team || !members.some(player => !player.checked_in) || c.has(key) ||
+    const undo = members.length > 0 && members.every(player => player.checked_in);
+    if (!a || !team || !members.length || c.has(key) ||
         members.some(player => c.has("attendance:" + player.id))) return;
     c.add(key);
     v();
-    d("Checking in " + team.name + "…");
+    d((undo ? "Undoing check-in for " : "Checking in ") + team.name + "…");
     try {
-      // One atomic update; preserve existing timestamps and every purchase column.
+      // Only update attendance fields; retain purchases and package selections.
+      const update = { checked_in: !undo, checked_in_at: undo ? null : new Date().toISOString() };
       const { data, error } = await t.from("golf_players")
-        .update({ checked_in: true, checked_in_at: new Date().toISOString() })
-        .eq("team_id", teamId).eq("checked_in", false).select("id");
+        .update(update).eq("team_id", teamId).eq("checked_in", undo).select("id");
       if (error) throw error;
       await g();
-      const remaining = s.filter(player => player.team_id === teamId && !player.checked_in);
-      d(remaining.length ? "Some golfers could not be checked in. Refresh and check your volunteer access." :
-        `${team.name}: all checked in (${data?.length || 0} updated).`);
+      const updated = s.filter(player => player.team_id === teamId);
+      const successful = updated.every(player => player.checked_in === !undo);
+      d(successful ? `${team.name}: ${undo ? "team check-in undone" : "all checked in"} (${data?.length || 0} updated).` :
+        "Some golfers could not be updated. Refresh and check volunteer access.");
     } catch (error) {
-      d("Unable to check in team: " + error.message);
+      d("Unable to update team check-in: " + error.message);
     } finally {
       c.delete(key);
       v();
