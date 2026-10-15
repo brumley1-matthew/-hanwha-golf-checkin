@@ -24,7 +24,7 @@ async function ta() {
     return `<div class="person">
       <div class="person-main"><div><div class="name">${u(b.name)} <button type="button" class="edit-name-btn" data-edit-name="${b.id}" aria-label="Edit name for ${u(b.name)}" ${c.has("name:" + b.id) ? "disabled" : ""}>Edit</button></div>
       <div class="small muted">${u(f(b))}${b.checked_in ? " \xB7 Arrived" : ""}</div></div>
-      <button data-check="${b.id}" ${c.has("attendance:" + b.id) || c.has("team-attendance:" + b.team_id) ? "disabled" : ""} class="${b.checked_in ? "" : "green"}" aria-label="${b.checked_in ? "Undo check-in for" : "Check in"} ${u(b.name)}">${b.checked_in ? "Undo" : "\u2713 Check In"}</button></div>
+      <button data-check="${b.id}" ${b.name.trim().toUpperCase() === "TBD" || c.has("attendance:" + b.id) || c.has("team-attendance:" + b.team_id) ? "disabled" : ""} class="${b.checked_in ? "" : "green"}" aria-label="${b.checked_in ? "Undo check-in for" : "Check in"} ${u(b.name)}">${b.checked_in ? "Undo" : "\u2713 Check In"}</button></div>
       <div class="purchases">
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-mulligan="${b.id}" aria-label="Mulligan $10 for ${u(b.name)}" ${b.mulligan_purchased || included ? "checked" : ""} ${included || O || soloSaving ? "disabled" : ""}><span>${included ? "Mulligan $10 \xB7 included in " + (T ? "Supreme" : "Solo") : "Mulligan $10"}</span></label>
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-putting="${b.id}" aria-label="Putting Contest $5 for ${u(b.name)}" ${b.putting_purchased || included ? "checked" : ""} ${included || j || soloSaving ? "disabled" : ""}><span>${included ? "Putting Contest $5 \xB7 included in " + (T ? "Supreme" : "Solo") : "Putting Contest $5"}</span></label>
@@ -32,7 +32,8 @@ async function ta() {
       </div></div>`;
   }
   function v() {
-    const b = s.length, S = s.filter((x) => x.checked_in).length;
+    const activePlayers = s.filter(x => x.name.trim().toUpperCase() !== "TBD");
+    const b = activePlayers.length, S = activePlayers.filter((x) => x.checked_in).length;
     r("total").textContent = b, r("arrived").textContent = S, r("missing").textContent = b - S, r("bar").style.width = (b ? 100 * S / b : 0) + "%";
     const query = r("search").value.trim().toLowerCase();
     const attendance = r("filter").value;
@@ -58,7 +59,7 @@ async function ta() {
     return `<button type="button" data-supreme-team="${team.id}" class="${purchased ? "" : "green"}" ${saving ? "disabled" : ""}>${saving ? "Saving…" : purchased ? "Undo Supreme Team $80" : "Supreme Team $80"}<span style="display:block;font-size:11px;font-weight:400;margin-top:3px">8 raffle tickets</span></button>`;
   }
   function teamButton(team) {
-    const members = s.filter(player => player.team_id === team.id);
+    const members = s.filter(player => player.team_id === team.id && player.name.trim().toUpperCase() !== "TBD");
     const saving = c.has("team-attendance:" + team.id);
     const pending = members.some(player => c.has("attendance:" + player.id));
     const complete = members.length > 0 && members.every(player => player.checked_in);
@@ -66,7 +67,7 @@ async function ta() {
   }
   async function checkInTeam(teamId) {
     const team = n.find(team => team.id === teamId);
-    const members = s.filter(player => player.team_id === teamId);
+    const members = s.filter(player => player.team_id === teamId && player.name.trim().toUpperCase() !== "TBD");
     const key = "team-attendance:" + teamId;
     const undo = members.length > 0 && members.every(player => player.checked_in);
     if (!a || !team || !members.length || c.has(key) ||
@@ -141,7 +142,7 @@ async function ta() {
     const S = b.target.closest("[data-check]");
     if (S) {
       const O = s.find((j) => j.id === Number(S.dataset.check));
-      O && !c.has("team-attendance:" + O.team_id) && k("golf_players", O, "checked_in", !O.checked_in, "checked_in_at", "attendance:" + O.id, "check-in");
+      O && O.name.trim().toUpperCase() !== "TBD" && !c.has("team-attendance:" + O.team_id) && k("golf_players", O, "checked_in", !O.checked_in, "checked_in_at", "attendance:" + O.id, "check-in");
     }
     const supremeAction = b.target.closest("[data-supreme-team]");
     if (supremeAction && !supremeAction.disabled) {
