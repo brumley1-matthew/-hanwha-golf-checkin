@@ -22,7 +22,7 @@ async function ta() {
   function y(b) {
     const S = h(b), T = !!S?.supreme_purchased, solo = !!b.solo_purchased, included = T || solo, O = c.has("mulligan:" + b.id), j = c.has("putting:" + b.id), soloSaving = c.has("solo:" + b.id), B = c.has("supreme:" + S?.id);
     return `<div class="person">
-      <div class="person-main"><div><div class="name">${u(b.name)}</div>
+      <div class="person-main"><div><div class="name">${u(b.name)} <button type="button" data-edit-name="${b.id}" aria-label="Edit name for ${u(b.name)}" ${c.has("name:" + b.id) ? "disabled" : ""}>Edit name</button></div>
       <div class="small muted">${u(f(b))}${b.checked_in ? " \xB7 Arrived" : ""}</div></div>
       <button data-check="${b.id}" ${c.has("attendance:" + b.id) || c.has("team-attendance:" + b.team_id) ? "disabled" : ""} class="${b.checked_in ? "" : "green"}" aria-label="${b.checked_in ? "Undo check-in for" : "Check in"} ${u(b.name)}">${b.checked_in ? "Undo" : "\u2713 Check In"}</button></div>
       <div class="purchases">
@@ -106,7 +106,38 @@ async function ta() {
       }
     }
   }
+  async function editGolferName(id) {
+    const player = s.find(x => x.id === id);
+    const key = "name:" + id;
+    if (!a || !player || c.has(key)) return;
+    const entered = window.prompt("Edit golfer name:", player.name);
+    if (entered === null) return;
+    const newName = entered.trim().replace(/\\s+/g, " ");
+    if (!newName || newName.length > 120) {
+      d("Enter a golfer name between 1 and 120 characters.");
+      return;
+    }
+    if (newName === player.name) return;
+    c.add(key);
+    v();
+    d("Saving golfer name…");
+    try {
+      const { data, error } = await t.from("golf_players").update({ name: newName })
+        .eq("id", player.id).eq("name", player.name).select("id,name");
+      if (error) throw error;
+      if (!data?.length) throw new Error("Name was changed elsewhere or volunteer access does not allow editing.");
+      await g();
+      d("Golfer name updated to " + newName + ".");
+    } catch (error) {
+      d("Unable to edit golfer name: " + error.message);
+    } finally {
+      c.delete(key);
+      v();
+    }
+  }
   document.addEventListener("click", (b) => {
+    const editAction = b.target.closest("[data-edit-name]");
+    if (editAction) { editGolferName(Number(editAction.dataset.editName)); return; }
     const S = b.target.closest("[data-check]");
     if (S) {
       const O = s.find((j) => j.id === Number(S.dataset.check));
