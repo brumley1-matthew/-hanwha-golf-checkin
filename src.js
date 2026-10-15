@@ -19,6 +19,38 @@ async function ta() {
       n = T.data.filter(team => team.id !== 4), s = O.data.filter(player => player.team_id !== 4), d(s.length ? "Connected \xB7 Attendance and purchases synchronized" : "No roster is visible. Ask the organizer to approve your volunteer account."), v();
     }
   }
+  async function addRosterSlot(teamId) {
+    const team = n.find(x => x.id === teamId);
+    if (!a || !team || c.has("add-roster")) return;
+    c.add("add-roster"); d("Adding TBD golfer to " + team.name + "…");
+    try {
+      const { error } = await t.from("golf_players").insert({team_id:teamId,name:"TBD"});
+      if (error) throw error;
+      await g();
+      d("Added TBD to " + team.name + ". Tap Edit when you have the golfer's name.");
+    } catch(error) { d("Unable to add golfer: " + error.message); }
+    finally { c.delete("add-roster"); v(); }
+  }
+  async function addRosterTeam() {
+    if (!a || c.has("add-roster")) return;
+    const entered = window.prompt("New team name:");
+    if (entered === null) return;
+    const name = entered.trim();
+    if (!name || name.length > 120) { d("Enter a team name between 1 and 120 characters."); return; }
+    if (!window.confirm("Add team " + name + " with four TBD golfer slots?")) return;
+    c.add("add-roster"); d("Creating " + name + "…");
+    try {
+      const {data,error} = await t.from("golf_teams").insert({name}).select("id,name").single();
+      if (error) throw error;
+      const {error:playerError} = await t.from("golf_players").insert(
+        Array.from({length:4},()=>({team_id:data.id,name:"TBD"}))
+      );
+      if (playerError) throw new Error("Team created but TBD slots could not be added: " + playerError.message);
+      await g();
+      d("Created " + name + " with four TBD slots. Edit names to include golfers in totals.");
+    } catch(error) { await g().catch(()=>{}); d("Unable to add team: " + error.message); }
+    finally { c.delete("add-roster"); v(); }
+  }
   function y(b) {
     const S = h(b), T = !!S?.supreme_purchased, solo = !!b.solo_purchased, included = T || solo, O = c.has("mulligan:" + b.id), j = c.has("putting:" + b.id), soloSaving = c.has("solo:" + b.id), B = c.has("supreme:" + S?.id);
     return `<div class="person">
@@ -43,14 +75,14 @@ async function ta() {
       (attendance === "all" || (attendance === "arrived" ? player.checked_in : !player.checked_in)));
     const visibleTeams = n.filter(team => !query || team.name.toLowerCase().includes(query) || matchingTeamIds.has(team.id));
     // Team actions always affect the whole team, regardless of search or attendance filters.
-    r("list").innerHTML = visibleTeams.map(team => {
+    r("list").innerHTML = `<div class="flex" style="margin-bottom:12px"><button type="button" data-add-team>Add New Team (4 TBD)</button><button type="button" data-add-individual>Add Individual (TBD)</button></div>` + visibleTeams.map(team => {
       const members = visible.filter(player => player.team_id === team.id);
       return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${supremeButton(team)}${teamButton(team)}</div>${members.map(y).join("")}</section>` : "";
     }).join("") + visible.filter(player => !h(player)).map(y).join("") || '<p class="muted">No matching golfers.</p>';
     const B = new Set([...r("teamList").querySelectorAll("details[open]")].map((x) => x.dataset.team));
-    r("teamList").innerHTML = visibleTeams.map((x) => {
+    r("teamList").innerHTML = `<div class="flex" style="margin-bottom:12px"><button type="button" data-add-team>Add New Team (4 TBD)</button><button type="button" data-add-individual>Add Individual (TBD)</button></div>` + visibleTeams.map((x) => {
       const ne = s.filter((he) => he.team_id === x.id);
-      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in).length}/${ne.length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${supremeButton(x)}${teamButton(x)}</div>${ne.map(y).join("")}</details>`;
+      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in && he.name.trim().toUpperCase() !== "TBD").length}/${ne.filter((he) => he.name.trim().toUpperCase() !== "TBD").length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${supremeButton(x)}${teamButton(x)}</div>${ne.map(y).join("")}</details>`;
     }).join("") || '<p class="muted">No matching teams.</p>';
   }
   function supremeButton(team) {
@@ -79,10 +111,10 @@ async function ta() {
       // Only update attendance fields; retain purchases and package selections.
       const update = { checked_in: !undo, checked_in_at: undo ? null : new Date().toISOString() };
       const { data, error } = await t.from("golf_players")
-        .update(update).eq("team_id", teamId).eq("checked_in", undo).select("id");
+        .update(update).eq("team_id", teamId).neq("name", "TBD").eq("checked_in", undo).select("id");
       if (error) throw error;
       await g();
-      const updated = s.filter(player => player.team_id === teamId);
+      const updated = s.filter(player => player.team_id === teamId && player.name.trim().toUpperCase() !== "TBD");
       const successful = updated.every(player => player.checked_in === !undo);
       d(successful ? `${team.name}: ${undo ? "team check-in undone" : "all checked in"} (${data?.length || 0} updated).` :
         "Some golfers could not be updated. Refresh and check volunteer access.");
@@ -137,6 +169,16 @@ async function ta() {
     }
   }
   document.addEventListener("click", (b) => {
+    if (b.target.closest("[data-add-team]")) { addRosterTeam(); return; }
+    if (b.target.closest("[data-add-individual]")) {
+      const options = n.map(team => team.id + ": " + team.name).join("\\n");
+      const selected = window.prompt("Enter the team number for the new TBD golfer:\\n" + options);
+      if (selected === null) return;
+      const teamId = Number(selected.trim());
+      if (!n.some(team => team.id === teamId)) { d("Team not found. Use a team number from the list."); return; }
+      addRosterSlot(teamId); return;
+    }
+
     const editAction = b.target.closest("[data-edit-name]");
     if (editAction) { editGolferName(Number(editAction.dataset.editName)); return; }
     const S = b.target.closest("[data-check]");
