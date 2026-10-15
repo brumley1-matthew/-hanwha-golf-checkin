@@ -28,7 +28,7 @@ async function ta() {
       <div class="purchases">
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-mulligan="${b.id}" aria-label="Mulligan $10 for ${u(b.name)}" ${b.mulligan_purchased || included ? "checked" : ""} ${included || O || soloSaving ? "disabled" : ""}><span>${included ? "Mulligan $10 \xB7 included in " + (T ? "Supreme" : "Solo") : "Mulligan $10"}</span></label>
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-putting="${b.id}" aria-label="Putting Contest $5 for ${u(b.name)}" ${b.putting_purchased || included ? "checked" : ""} ${included || j || soloSaving ? "disabled" : ""}><span>${included ? "Putting Contest $5 \xB7 included in " + (T ? "Supreme" : "Solo") : "Putting Contest $5"}</span></label>
-      <label class="purchase-option ${solo ? "included" : ""}"><input type="checkbox" data-solo="${b.id}" aria-label="Solo Package $20 for ${u(b.name)}" ${solo ? "checked" : ""} ${soloSaving || O || j ? "disabled" : ""}><span>Solo Package $20</span></label>
+      <label class="purchase-option ${solo ? "included" : ""}"><input type="checkbox" data-solo="${b.id}" aria-label="Solo Package $20 for ${u(b.name)}" ${solo ? "checked" : ""} ${soloSaving || O || j ? "disabled" : ""}><span>Solo Package $20<span style="display:block;font-size:11px;font-weight:400;margin-top:3px">2 raffle tickets</span></span></label>
       </div></div>`;
   }
   function v() {
@@ -55,7 +55,7 @@ async function ta() {
   function supremeButton(team) {
     const purchased = !!team.supreme_purchased;
     const saving = c.has("supreme:" + team.id);
-    return `<button type="button" data-supreme-team="${team.id}" class="${purchased ? "" : "green"}" ${saving ? "disabled" : ""}>${saving ? "Saving…" : purchased ? "Undo Supreme Team $80" : "Supreme Team $80"}</button>`;
+    return `<button type="button" data-supreme-team="${team.id}" class="${purchased ? "" : "green"}" ${saving ? "disabled" : ""}>${saving ? "Saving…" : purchased ? "Undo Supreme Team $80" : "Supreme Team $80"}<span style="display:block;font-size:11px;font-weight:400;margin-top:3px">8 raffle tickets</span></button>`;
   }
   function teamButton(team) {
     const members = s.filter(player => player.team_id === team.id);
