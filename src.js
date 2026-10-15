@@ -16,7 +16,7 @@ async function ta() {
     const b = ++o, S = a.id, [T, O] = await Promise.all([t.from("golf_teams").select("id,name,supreme_purchased,supreme_purchased_at").order("id"), t.from("golf_players").select("id,name,team_id,checked_in,checked_in_at,mulligan_purchased,mulligan_purchased_at,putting_purchased,putting_purchased_at,solo_purchased,solo_purchased_at").order("name")]);
     if (!(b !== o || a?.id !== S)) {
       if (T.error || O.error) throw T.error || O.error;
-      n = T.data, s = O.data, d(s.length ? "Connected \xB7 Attendance and purchases synchronized" : "No roster is visible. Ask the organizer to approve your volunteer account."), v();
+      n = T.data.filter(team => team.id !== 4), s = O.data.filter(player => player.team_id !== 4), d(s.length ? "Connected \xB7 Attendance and purchases synchronized" : "No roster is visible. Ask the organizer to approve your volunteer account."), v();
     }
   }
   function y(b) {
