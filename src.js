@@ -44,12 +44,12 @@ async function ta() {
     // Team actions always affect the whole team, regardless of search or attendance filters.
     r("list").innerHTML = visibleTeams.map(team => {
       const members = visible.filter(player => player.team_id === team.id);
-      return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${teamButton(team)}${supremeButton(team)}</div>${members.map(y).join("")}</section>` : "";
+      return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${supremeButton(team)}${teamButton(team)}</div>${members.map(y).join("")}</section>` : "";
     }).join("") + visible.filter(player => !h(player)).map(y).join("") || '<p class="muted">No matching golfers.</p>';
     const B = new Set([...r("teamList").querySelectorAll("details[open]")].map((x) => x.dataset.team));
     r("teamList").innerHTML = visibleTeams.map((x) => {
       const ne = s.filter((he) => he.team_id === x.id);
-      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in).length}/${ne.length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${teamButton(x)}${supremeButton(x)}</div>${ne.map(y).join("")}</details>`;
+      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in).length}/${ne.length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${supremeButton(x)}${teamButton(x)}</div>${ne.map(y).join("")}</details>`;
     }).join("") || '<p class="muted">No matching teams.</p>';
   }
   function supremeButton(team) {
