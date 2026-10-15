@@ -1,23 +1,191 @@
-import { createClient } from '@supabase/supabase-js';
-import './style.css';
-const url=import.meta.env.VITE_SUPABASE_URL;
-const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const app=document.querySelector('#app');
-const supabase=url&&key?createClient(url,key):null;
-let session=null,players=[],teams=[],tab='check',filter='all',search='',channel=null;
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function notify(message,error=false){const n=document.querySelector('#notice');if(n){n.textContent=message;n.className=error?'error':'notice';}}
-function teamName(id){return teams.find(t=>t.id===id)?.name||'Unassigned'}
-function download(){const rows=[['Name','Team','Status','Checked In At'],...players.map(p=>[p.name,teamName(p.team_id),p.checked_in?'Arrived':'Not arrived',p.checked_in_at||''])];const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\r\n');const a=document.createElement('a');const u=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.href=u;a.download='hanwha-golf-attendance.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),2000)}
-function render(){if(!supabase){app.innerHTML='<main><h1>Hanwha Golf Check-In</h1><p>Configure your Supabase environment variables first. See README.md.</p></main>';return}
-if(!session){app.innerHTML=`<main class="login"><div class="hero"><small>HANWHA POWER</small><h1>Charity Golf Check-In</h1><p>October 17, 2026</p></div><section class="panel"><h2>Volunteer sign-in</h2><p>Enter your approved email address to receive a secure sign-in link.</p><form id="login"><input name="email" type="email" placeholder="you@company.com" autocomplete="email" required/><button type="submit">Email me a sign-in link</button></form><p id="notice" class="notice"></p></section></main>`;document.querySelector('#login').onsubmit=login;return}
-const arrived=players.filter(p=>p.checked_in).length;const visible=players.filter(p=>(p.name+' '+teamName(p.team_id)).toLowerCase().includes(search.toLowerCase())&&(filter==='all'||(filter==='arrived'?p.checked_in:!p.checked_in)));
-const person=p=>`<div class="person"><div><strong>${esc(p.name)}</strong><small>${esc(teamName(p.team_id))}</small></div><button class="${p.checked_in?'undo':'check'}" data-id="${p.id}">${p.checked_in?'Undo':'✓ Check In'}</button></div>`;
-app.innerHTML=`<main><div class="hero"><small>HANWHA POWER</small><h1>Charity Golf Check-In</h1><p>October 17, 2026</p></div><div class="metrics"><div><small>Golfers</small><strong>${players.length}</strong></div><div><small>Arrived</small><strong>${arrived}</strong></div><div><small>Missing</small><strong>${players.length-arrived}</strong></div></div><div class="progress"><span style="width:${players.length?arrived/players.length*100:0}%"></span></div><nav><button data-tab="check" class="${tab==='check'?'selected':''}">Check-In</button><button data-tab="teams" class="${tab==='teams'?'selected':''}">Teams</button><button data-tab="report" class="${tab==='report'?'selected':''}">Report</button></nav>${tab==='check'?`<section class="panel"><input id="search" placeholder="Search golfer or team…" value="${esc(search)}"/><select id="filter"><option value="all" ${filter==='all'?'selected':''}>All golfers</option><option value="missing" ${filter==='missing'?'selected':''}>Not arrived</option><option value="arrived" ${filter==='arrived'?'selected':''}>Checked in</option></select><div id="people">${visible.map(person).join('')||'<p>No matching golfers.</p>'}</div></section>`:tab==='teams'?`<section>${teams.map(t=>{const group=players.filter(p=>p.team_id===t.id);return `<details class="panel"><summary><strong>${esc(t.name)}</strong><span>${group.filter(p=>p.checked_in).length}/${group.length} arrived</span></summary>${group.map(person).join('')}</details>`}).join('')}</section>`:`<section class="panel"><h2>Attendance report</h2><p>${arrived} of ${players.length} golfers checked in.</p><button id="export">Download CSV for Excel</button></section>`}<p id="notice" class="notice"></p><footer><span>Signed in: ${esc(session.user.email)}</span><button id="signout" class="link">Sign out</button></footer></main>`;
-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>toggle(Number(b.dataset.id)));document.querySelector('#signout').onclick=()=>supabase.auth.signOut();document.querySelector('#export')?.addEventListener('click',download);document.querySelector('#filter')?.addEventListener('change',e=>{filter=e.target.value;render()});document.querySelector('#search')?.addEventListener('input',e=>{search=e.target.value;const selStart=e.target.selectionStart;render();const field=document.querySelector('#search');field.focus();field.setSelectionRange(selStart,selStart)});
+// Recovered from the production golf-pin.js application to preserve deployed purchases and PIN access.
+import { createClient as Zi } from "@supabase/supabase-js";
+async function ta() {
+  const r = (b) => document.getElementById(b), e = window.GOLF_CONFIG;
+  if (!e?.url || !e?.publishableKey || e.url.includes("YOUR_PROJECT") || e.publishableKey.includes("YOUR_KEY")) {
+    r("status").textContent = "Setup needed: configure the Supabase project URL and publishable key.";
+    return;
+  }
+  const t = Zi(e.url, e.publishableKey, { auth: { detectSessionInUrl: true, persistSession: true, autoRefreshToken: true, flowType: "implicit" } });
+  let s = [], n = [], i = null, a = null, o = 0, l = Promise.resolve();
+  const c = /* @__PURE__ */ new Set(), u = (b) => String(b ?? "").replace(/[&<>"']/g, (S) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[S]), h = (b) => n.find((S) => S.id === b.team_id), f = (b) => h(b)?.name || "Unassigned", d = (b) => {
+    r("status").textContent = b;
+  }, p = () => g().catch((b) => d("Refresh failed: " + b.message));
+  async function g() {
+    if (!a) return;
+    const b = ++o, S = a.id, [T, O] = await Promise.all([t.from("golf_teams").select("id,name,supreme_purchased,supreme_purchased_at").order("id"), t.from("golf_players").select("id,name,team_id,checked_in,checked_in_at,mulligan_purchased,mulligan_purchased_at,putting_purchased,putting_purchased_at,solo_purchased,solo_purchased_at").order("name")]);
+    if (!(b !== o || a?.id !== S)) {
+      if (T.error || O.error) throw T.error || O.error;
+      n = T.data, s = O.data, d(s.length ? "Connected \xB7 Attendance and purchases synchronized" : "No roster is visible. Ask the organizer to approve your volunteer account."), v();
+    }
+  }
+  function y(b) {
+    const S = h(b), T = !!S?.supreme_purchased, solo = !!b.solo_purchased, included = T || solo, O = c.has("mulligan:" + b.id), j = c.has("putting:" + b.id), soloSaving = c.has("solo:" + b.id), B = c.has("supreme:" + S?.id);
+    return `<div class="person">
+      <div class="person-main"><div><div class="name">${u(b.name)}</div>
+      <div class="small muted">${u(f(b))}${b.checked_in ? " \xB7 Arrived" : ""}</div></div>
+      <button data-check="${b.id}" ${c.has("attendance:" + b.id) || c.has("team-attendance:" + b.team_id) ? "disabled" : ""} class="${b.checked_in ? "" : "green"}" aria-label="${b.checked_in ? "Undo check-in for" : "Check in"} ${u(b.name)}">${b.checked_in ? "Undo" : "\u2713 Check In"}</button></div>
+      <div class="purchases">
+      <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-mulligan="${b.id}" aria-label="Mulligan $10 for ${u(b.name)}" ${b.mulligan_purchased || included ? "checked" : ""} ${included || O || soloSaving ? "disabled" : ""}><span>${included ? "Mulligan $10 \xB7 included in " + (T ? "Supreme" : "Solo") : "Mulligan $10"}</span></label>
+      <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-putting="${b.id}" aria-label="Putting Contest $5 for ${u(b.name)}" ${b.putting_purchased || included ? "checked" : ""} ${included || j || soloSaving ? "disabled" : ""}><span>${included ? "Putting Contest $5 \xB7 included in " + (T ? "Supreme" : "Solo") : "Putting Contest $5"}</span></label>
+      <label class="purchase-option ${solo ? "included" : ""}"><input type="checkbox" data-solo="${b.id}" aria-label="Solo Package $20 for ${u(b.name)}" ${solo ? "checked" : ""} ${soloSaving || O || j ? "disabled" : ""}><span>Solo Package $20</span></label>
+      <label class="purchase-option ${T ? "included" : ""}"><input type="checkbox" data-supreme="${S?.id ?? ""}" aria-label="Supreme Team $80 for ${u(b.name)}" ${T ? "checked" : ""} ${!S || B ? "disabled" : ""}><span>Supreme Team $80 <span class="small muted">(entire team)</span></span></label>
+      </div></div>`;
+  }
+  function v() {
+    const b = s.length, S = s.filter((x) => x.checked_in).length;
+    r("total").textContent = b, r("arrived").textContent = S, r("missing").textContent = b - S, r("bar").style.width = (b ? 100 * S / b : 0) + "%";
+    const query = r("search").value.trim().toLowerCase();
+    const attendance = r("filter").value;
+    const matches = player => (player.name + " " + f(player)).toLowerCase().includes(query);
+    const visible = s.filter(player => matches(player) &&
+      (attendance === "all" || (attendance === "arrived" ? player.checked_in : !player.checked_in)));
+    const visibleTeams = n.filter(team => team.name.toLowerCase().includes(query) ||
+      s.some(player => player.team_id === team.id && matches(player)));
+    // Team actions always affect the whole team, regardless of search or attendance filters.
+    r("list").innerHTML = visibleTeams.map(team => {
+      const members = visible.filter(player => player.team_id === team.id);
+      return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${teamButton(team)}</div>${members.map(y).join("")}</section>` : "";
+    }).join("") + visible.filter(player => !h(player)).map(y).join("") || '<p class="muted">No matching golfers.</p>';
+    const B = new Set([...r("teamList").querySelectorAll("details[open]")].map((x) => x.dataset.team));
+    r("teamList").innerHTML = visibleTeams.map((x) => {
+      const ne = s.filter((he) => he.team_id === x.id);
+      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in).length}/${ne.length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${teamButton(x)}</div>${ne.map(y).join("")}</details>`;
+    }).join("") || '<p class="muted">No matching teams.</p>';
+  }
+  function teamButton(team) {
+    const members = s.filter(player => player.team_id === team.id);
+    const saving = c.has("team-attendance:" + team.id);
+    const pending = members.some(player => c.has("attendance:" + player.id));
+    const complete = members.length > 0 && members.every(player => player.checked_in);
+    return `<button class="green" data-check-team="${team.id}" aria-label="Check In All for ${u(team.name)}" ${saving || pending || complete || !members.length ? "disabled" : ""}>${saving ? "Saving…" : complete ? "All checked in" : "Check In All"}</button>`;
+  }
+  async function checkInTeam(teamId) {
+    const team = n.find(team => team.id === teamId);
+    const members = s.filter(player => player.team_id === teamId);
+    const key = "team-attendance:" + teamId;
+    if (!a || !team || !members.some(player => !player.checked_in) || c.has(key) ||
+        members.some(player => c.has("attendance:" + player.id))) return;
+    c.add(key);
+    v();
+    d("Checking in " + team.name + "…");
+    try {
+      // One atomic update; preserve existing timestamps and every purchase column.
+      const { data, error } = await t.from("golf_players")
+        .update({ checked_in: true, checked_in_at: new Date().toISOString() })
+        .eq("team_id", teamId).eq("checked_in", false).select("id");
+      if (error) throw error;
+      await g();
+      const remaining = s.filter(player => player.team_id === teamId && !player.checked_in);
+      d(remaining.length ? "Some golfers could not be checked in. Refresh and check your volunteer access." :
+        `${team.name}: all checked in (${data?.length || 0} updated).`);
+    } catch (error) {
+      d("Unable to check in team: " + error.message);
+    } finally {
+      c.delete(key);
+      v();
+    }
+  }
+  async function k(b, S, T, O, j, B, x) {
+    if (!(!a || !S || c.has(B))) {
+      c.add(B), v(), d("Saving " + x + "\u2026");
+      try {
+        const { data: ne, error: he } = await t.from(b).update({ [T]: O, [j]: O ? (/* @__PURE__ */ new Date()).toISOString() : null }).eq("id", S.id).eq(T, S[T]).select("id");
+        if (he) throw he;
+        await g(), ne?.length ? d("Saved " + x + ".") : d("This record changed on another device, or your account cannot update it. Check the latest status and try again.");
+      } catch (ne) {
+        d("Unable to save " + x + ": " + ne.message);
+      } finally {
+        c.delete(B), v();
+      }
+    }
+  }
+  document.addEventListener("click", (b) => {
+    const S = b.target.closest("[data-check]");
+    if (S) {
+      const O = s.find((j) => j.id === Number(S.dataset.check));
+      O && !c.has("team-attendance:" + O.team_id) && k("golf_players", O, "checked_in", !O.checked_in, "checked_in_at", "attendance:" + O.id, "check-in");
+    }
+    const teamAction = b.target.closest("[data-check-team]");
+    if (teamAction && !teamAction.disabled) checkInTeam(Number(teamAction.dataset.checkTeam));
+    const T = b.target.closest("[data-tab]");
+    T && (document.querySelectorAll("[data-tab]").forEach((O) => O.classList.toggle("selected", O === T)), ["check", "teams", "report"].forEach((O) => r(O).classList.toggle("hide", O !== T.dataset.tab)));
+  }), document.addEventListener("change", (b) => {
+    const S = b.target;
+    if (S.matches("[data-mulligan]")) {
+      const T = s.find((O) => O.id === Number(S.dataset.mulligan));
+      T && !T.solo_purchased && !c.has("solo:" + T.id) && !h(T)?.supreme_purchased && k("golf_players", T, "mulligan_purchased", S.checked, "mulligan_purchased_at", "mulligan:" + T.id, "mulligan purchase");
+    }
+    if (S.matches("[data-putting]")) {
+      const T = s.find((O) => O.id === Number(S.dataset.putting));
+      T && !T.solo_purchased && !c.has("solo:" + T.id) && !h(T)?.supreme_purchased && k("golf_players", T, "putting_purchased", S.checked, "putting_purchased_at", "putting:" + T.id, "putting contest entry");
+    }
+    if (S.matches("[data-solo]")) {
+      const T = s.find((O) => O.id === Number(S.dataset.solo));
+      T && !c.has("mulligan:" + T.id) && !c.has("putting:" + T.id) && k("golf_players", T, "solo_purchased", S.checked, "solo_purchased_at", "solo:" + T.id, "Solo Package purchase");
+    }
+    if (S.matches("[data-supreme]")) {
+      const T = n.find((O) => O.id === Number(S.dataset.supreme));
+      T && k("golf_teams", T, "supreme_purchased", S.checked, "supreme_purchased_at", "supreme:" + T.id, "Supreme purchase for " + T.name);
+    }
+  }), r("search").oninput = v, r("filter").onchange = v, r("export").onclick = () => {
+    const S = [["Name", "Team", "Status", "Checked in at", "Individual mulligan purchased", "Mulligan purchase time", "Supreme Team purchased", "Supreme purchase time", "Mulligan available", "Individual Putting Contest entry", "Putting purchase time", "Putting Contest included", "Solo Package $20 purchased", "Solo purchase time"], ...s.map((j) => {
+      const B = h(j);
+      return [j.name, f(j), j.checked_in ? "Arrived" : "Not arrived", j.checked_in_at || "", j.mulligan_purchased ? "Yes" : "No", j.mulligan_purchased_at || "", B?.supreme_purchased ? "Yes" : "No", B?.supreme_purchased_at || "", j.mulligan_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.putting_purchased ? "Yes" : "No", j.putting_purchased_at || "", j.putting_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.solo_purchased ? "Yes" : "No", j.solo_purchased_at || ""];
+    })].map((j) => j.map((B) => '"' + String(B).replace(/"/g, '""') + '"').join(",")).join(`\r
+`), T = document.createElement("a"), O = URL.createObjectURL(new Blob([S], { type: "text/csv;charset=utf-8" }));
+    T.href = O, T.download = "hanwha-golf-attendance-purchases.csv", T.click(), setTimeout(() => URL.revokeObjectURL(O), 1e3);
+  }, r("loginForm").onsubmit = async (b) => {
+    b.preventDefault();
+    const S = b.target.querySelector("button");
+    S.disabled = true;
+    r("loginMessage").textContent = "Signing in\u2026";
+    try {
+      const response = await fetch(e.url + "/functions/v1/volunteer-pin-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: r("pin").value.trim() }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Sign-in failed.");
+      const { error } = await t.auth.setSession({ access_token: result.access_token, refresh_token: result.refresh_token });
+      if (error) throw error;
+      r("pin").value = "";
+      r("loginMessage").textContent = "Signed in.";
+    } catch (T) {
+      r("loginMessage").textContent = T.message;
+    } finally {
+      S.disabled = false;
+    }
+  }, r("logout").onclick = async () => {
+    const { error: b } = await t.auth.signOut({ scope: "local" });
+    b && d("Sign-out failed: " + b.message);
+  }, setInterval(() => {
+    a && document.visibilityState === "visible" && p();
+  }, 3e4), document.addEventListener("visibilitychange", () => {
+    a && document.visibilityState === "visible" && p();
+  });
+  async function w(b) {
+    if (!(b?.user?.id === a?.id && i)) {
+      if (a = b?.user || null, ++o, r("login").classList.toggle("hide", !!a), r("app").classList.toggle("hide", !a), i) {
+        const S = i;
+        i = null, await t.removeChannel(S);
+      }
+      if (!a) {
+        s = [], n = [], v(), d("Sign in to begin check-in.");
+        return;
+      }
+      r("identity").textContent = a.email === "shared-volunteers@golf-checkin.invalid" ? "Volunteer \xB7 Shared PIN" : a.email, await g(), i = t.channel("golf-attendance-purchases").on("postgres_changes", { event: "*", schema: "public", table: "golf_players" }, p).on("postgres_changes", { event: "*", schema: "public", table: "golf_teams" }, p).subscribe((S) => {
+        S === "SUBSCRIBED" ? d("Connected \xB7 Live attendance and purchases synchronized") : ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(S) && d("Live connection interrupted \xB7 Attendance and purchases refresh every 30 seconds.");
+      });
+    }
+  }
+  const R = (b) => (l = l.then(() => w(b)).catch((S) => d("Unable to load check-in: " + S.message)), l);
+  t.auth.onAuthStateChange((b, S) => {
+    setTimeout(() => R(S), 0);
+  });
+  const { data: L, error: A } = await t.auth.getSession();
+  if (A) throw A;
+  await R(L.session);
+  const C = new URLSearchParams(location.hash.slice(1)).get("error_description") || new URLSearchParams(location.search).get("error_description");
+  C && (r("loginMessage").textContent = "Sign-in link failed: " + C + ". Request a new link below.");
 }
-async function login(e){e.preventDefault();const email=e.target.elements.email.value.trim();const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin,shouldCreateUser:false}});notify(error?error.message:'Check your email for the sign-in link.',!!error)}
-async function load(){if(!session)return;const [t,p]=await Promise.all([supabase.from('golf_teams').select('id,name').order('id'),supabase.from('golf_players').select('id,name,team_id,checked_in,checked_in_at').order('id')]);if(t.error||p.error){render();notify(t.error?.message||p.error?.message,true);return}teams=t.data||[];players=p.data||[];render()}
-async function toggle(id){const p=players.find(p=>p.id===id);if(!p)return;const newValue=!p.checked_in;const {data,error}=await supabase.from('golf_players').update({checked_in:newValue,checked_in_at:newValue?new Date().toISOString():null}).eq('id',id).select('id');if(error){notify(error.message,true);return}if(!data?.length){notify('Update not permitted. Ask the administrator to approve your email.',true);return}await load()}
-async function subscribe(){if(channel)await supabase.removeChannel(channel);channel=supabase.channel('golf-checkins').on('postgres_changes',{event:'UPDATE',schema:'public',table:'golf_players'},()=>load()).subscribe()}
-if(supabase){supabase.auth.onAuthStateChange((_event,s)=>{const changed=session?.user?.id!==s?.user?.id;session=s;if(changed&&session){render();setTimeout(()=>{load();subscribe()},0)}else if(!session){if(channel){supabase.removeChannel(channel);channel=null}players=[];teams=[];render()}});supabase.auth.getSession().then(({data})=>{session=data.session;render();if(session){load();subscribe()}})}else render();
+ta().catch((r) => {
+  document.getElementById("status").textContent = "Unable to start check-in: " + r.message;
+});

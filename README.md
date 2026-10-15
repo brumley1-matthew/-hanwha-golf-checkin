@@ -1,48 +1,21 @@
-# Hanwha Power Golf Check-In — setup
+# Hanwha Power Golf Check-In
 
-## 1. Secure the existing database
+The application preserves the production Hanwha Power and Ms. Rina’s House of Blessings branding, cash-only package flyer, existing Supabase roster, and purchase records. The production application and assets were recovered from the live website because the previous GitHub main branch lacked its PIN and purchase features.
 
-Run `schema.sql` in Supabase **SQL Editor**. It preserves all existing teams and golfers, replaces the three broad policies from the earlier instructions, and limits golfer updates to `checked_in` and `checked_in_at` columns. IMPORTANT: If you have created other permissive policies for these tables, inspect and remove them before launch; PostgreSQL permissive policies combine with OR.
+## Development
 
-Add approved volunteers in the SQL Editor (change the email):
+Use Node.js 22.12+ (Node 24 also works). Run `npm ci`, then `npm run dev`. Run `npm run build` for a production build. Vercel uses the committed Vite configuration and publishes `dist`. `public/config.js` supplies the public Supabase URL and publishable key; never use a service-role key in browser code.
 
-```sql
-insert into public.golf_volunteers (email)
-values ('you@yourcompany.com'), ('helper@yourcompany.com')
-on conflict (email) do nothing;
-```
+Volunteer PIN sign-in uses the existing Supabase `volunteer-pin-login` Edge Function. The PIN is checked by the server and is not embedded in application code. Volunteer sessions use Supabase authentication and existing database policies. Signing out is local to the current device.
 
-To review policies:
+Search matches golfer or team names, ignores case and surrounding whitespace, and combines with the attendance filter. Both the check-in list and Teams tab provide **Check In All**. The action updates only unchecked members of that team with one database update; it does not overwrite prior check-in timestamps or purchase fields. Already-complete teams disable the button. Individual check-in and undo remain available.
 
-```sql
-select tablename, policyname, roles, cmd from pg_policies
-where schemaname='public' and tablename in ('golf_teams','golf_players','golf_volunteers');
-```
+Mulligan $10, Putting Contest $5, Solo Package $20, and Supreme Team $80 controls retain their production behavior. Solo and Supreme include mulligan and putting selections; Supreme applies automatically to every team member. Existing independent purchases are retained when a package is removed. The flyer retains raffle ticket pricing and package quantities. CSV export includes attendance and purchases.
 
-## 2. Enable email sign-in
+Realtime subscriptions listen to both `golf_players` and `golf_teams`, refresh after writes and when returning to a visible tab, and fall back to a 30-second refresh when realtime is unavailable. Supabase must have both tables enabled in its Realtime publication and appropriate authenticated read/update policies. Existing remote configuration is preserved; do not run legacy SQL scripts blindly because they describe an older email-login workflow and do not include all purchase permissions.
 
-Supabase Dashboard > Authentication > Providers > Email. Enable Email and email OTP / magic links. **Turn off "Allow new users to sign up"** to restrict account creation. Create each volunteer's account in Authentication > Users > Add user (send invite or create a confirmed account). The app uses `shouldCreateUser: false`, so an account must exist before sign-in. Supabase's default email sending limits may require configuring custom SMTP for more users.
+## Validation
 
-## 3. Set up redirect URLs
+Run `npx playwright install chromium`, then `npm test` with the dev server running. In an environment with system Chromium, use `CHROMIUM_PATH=/usr/bin/chromium npm test`. `TEST_BASE_URL` can target a deployed site. Browser tests intercept Supabase traffic and use an isolated 96-player, 24-team fixture; they never modify production data. They exercise PIN submission, search/filtering, team and individual attendance, timestamp/purchase preservation, failure handling, Solo/Supreme selections, realtime messages, branding assets, CSV download, and sign-out.
 
-In Authentication > URL Configuration, add your final website URL (for example `https://your-project.vercel.app`) to **Redirect URLs** and set **Site URL** to the same. During local testing, you may also add `http://localhost:8000` to redirect URLs.
-
-## 4. Connect the website
-
-Copy `config.example.js` to `config.js`. In Supabase Dashboard > Project Settings > API Keys (or Connect), copy the **Project URL** and **publishable** key. Replace placeholders. Do not use the service_role or secret key. `config.js` is public browser configuration; security depends on RLS, not secrecy of this key.
-
-## 5. Test locally
-
-From this directory run `python3 -m http.server 8000` and open `http://localhost:8000`. Email login requires the user to exist in Authentication and in `golf_volunteers`.
-
-## 6. Deploy on Vercel
-
-Create a private GitHub repository containing `index.html`, `config.js`, and `README.md` (and optionally `schema.sql`), then in Vercel click **Add New > Project > Import Git Repository**. Framework preset: **Other**; no build command; output directory: root. Deploy. Then configure the deployed URL in Supabase Authentication > URL Configuration and test the login link on a phone and a computer. **Avoid putting `schema.sql` in a public repository** if you want to minimize operational details being exposed.
-
-## 7. Event-day test
-
-Sign in on two devices using separate approved volunteer accounts. Check in one test golfer on device A and confirm device B updates. Undo the check-in. Confirm CSV export. Keep a paper backup in case the venue loses internet connectivity.
-
-### Limitations
-
-This starter app supports check-in and attendance export, not roster edits or team reassignment. It requires internet access. Realtime event subscriptions are backed by database RLS. Supabase free plan limits and default email rate limits apply. Team data is only reloaded when the roster is loaded, not on team-name edits (which are disabled in this app).
+Production read-only validation found **93 golfers and 24 teams**. The user requested preserving that current roster. The app displays actual counts and never seeds, deletes, resets, or invents roster entries. Production purchase controls should not be exercised against real golfers merely to test them; use isolated fixtures.
