@@ -22,7 +22,7 @@ async function ta() {
   function y(b) {
     const S = h(b), T = !!S?.supreme_purchased, solo = !!b.solo_purchased, included = T || solo, O = c.has("mulligan:" + b.id), j = c.has("putting:" + b.id), soloSaving = c.has("solo:" + b.id), B = c.has("supreme:" + S?.id);
     return `<div class="person">
-      <div class="person-main"><div><div class="name">${u(b.name)} <button type="button" data-edit-name="${b.id}" aria-label="Edit name for ${u(b.name)}" ${c.has("name:" + b.id) ? "disabled" : ""}>Edit name</button></div>
+      <div class="person-main"><div><div class="name">${u(b.name)} <button type="button" class="edit-name-btn" data-edit-name="${b.id}" aria-label="Edit name for ${u(b.name)}" ${c.has("name:" + b.id) ? "disabled" : ""}>Edit name</button></div>
       <div class="small muted">${u(f(b))}${b.checked_in ? " \xB7 Arrived" : ""}</div></div>
       <button data-check="${b.id}" ${c.has("attendance:" + b.id) || c.has("team-attendance:" + b.team_id) ? "disabled" : ""} class="${b.checked_in ? "" : "green"}" aria-label="${b.checked_in ? "Undo check-in for" : "Check in"} ${u(b.name)}">${b.checked_in ? "Undo" : "\u2713 Check In"}</button></div>
       <div class="purchases">
