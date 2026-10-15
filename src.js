@@ -29,7 +29,6 @@ async function ta() {
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-mulligan="${b.id}" aria-label="Mulligan $10 for ${u(b.name)}" ${b.mulligan_purchased || included ? "checked" : ""} ${included || O || soloSaving ? "disabled" : ""}><span>${included ? "Mulligan $10 \xB7 included in " + (T ? "Supreme" : "Solo") : "Mulligan $10"}</span></label>
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-putting="${b.id}" aria-label="Putting Contest $5 for ${u(b.name)}" ${b.putting_purchased || included ? "checked" : ""} ${included || j || soloSaving ? "disabled" : ""}><span>${included ? "Putting Contest $5 \xB7 included in " + (T ? "Supreme" : "Solo") : "Putting Contest $5"}</span></label>
       <label class="purchase-option ${solo ? "included" : ""}"><input type="checkbox" data-solo="${b.id}" aria-label="Solo Package $20 for ${u(b.name)}" ${solo ? "checked" : ""} ${soloSaving || O || j ? "disabled" : ""}><span>Solo Package $20</span></label>
-      <label class="purchase-option ${T ? "included" : ""}"><input type="checkbox" data-supreme="${S?.id ?? ""}" aria-label="Supreme Team $80 for ${u(b.name)}" ${T ? "checked" : ""} ${!S || B ? "disabled" : ""}><span>Supreme Team $80 <span class="small muted">(entire team)</span></span></label>
       </div></div>`;
   }
   function v() {
@@ -45,13 +44,18 @@ async function ta() {
     // Team actions always affect the whole team, regardless of search or attendance filters.
     r("list").innerHTML = visibleTeams.map(team => {
       const members = visible.filter(player => player.team_id === team.id);
-      return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${teamButton(team)}</div>${members.map(y).join("")}</section>` : "";
+      return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${teamButton(team)}${supremeButton(team)}</div>${members.map(y).join("")}</section>` : "";
     }).join("") + visible.filter(player => !h(player)).map(y).join("") || '<p class="muted">No matching golfers.</p>';
     const B = new Set([...r("teamList").querySelectorAll("details[open]")].map((x) => x.dataset.team));
     r("teamList").innerHTML = visibleTeams.map((x) => {
       const ne = s.filter((he) => he.team_id === x.id);
-      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in).length}/${ne.length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${teamButton(x)}</div>${ne.map(y).join("")}</details>`;
+      return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in).length}/${ne.length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${teamButton(x)}${supremeButton(x)}</div>${ne.map(y).join("")}</details>`;
     }).join("") || '<p class="muted">No matching teams.</p>';
+  }
+  function supremeButton(team) {
+    const purchased = !!team.supreme_purchased;
+    const saving = c.has("supreme:" + team.id);
+    return `<button type="button" data-supreme-team="${team.id}" class="${purchased ? "" : "green"}" ${saving ? "disabled" : ""}>${saving ? "Saving…" : purchased ? "Undo Supreme Team $80" : "Supreme Team $80"}</button>`;
   }
   function teamButton(team) {
     const members = s.filter(player => player.team_id === team.id);
@@ -107,6 +111,11 @@ async function ta() {
     if (S) {
       const O = s.find((j) => j.id === Number(S.dataset.check));
       O && !c.has("team-attendance:" + O.team_id) && k("golf_players", O, "checked_in", !O.checked_in, "checked_in_at", "attendance:" + O.id, "check-in");
+    }
+    const supremeAction = b.target.closest("[data-supreme-team]");
+    if (supremeAction && !supremeAction.disabled) {
+      const team = n.find(x => x.id === Number(supremeAction.dataset.supremeTeam));
+      if (team) k("golf_teams", team, "supreme_purchased", !team.supreme_purchased, "supreme_purchased_at", "supreme:" + team.id, "Supreme Team $80 for " + team.name);
     }
     const teamAction = b.target.closest("[data-check-team]");
     if (teamAction && !teamAction.disabled) checkInTeam(Number(teamAction.dataset.checkTeam));
