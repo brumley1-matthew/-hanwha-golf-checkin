@@ -37,11 +37,11 @@ async function ta() {
     r("total").textContent = b, r("arrived").textContent = S, r("missing").textContent = b - S, r("bar").style.width = (b ? 100 * S / b : 0) + "%";
     const query = r("search").value.trim().toLowerCase();
     const attendance = r("filter").value;
-    const matches = player => (player.name + " " + f(player)).toLowerCase().includes(query);
+    const matchingTeamIds = new Set(query ? s.filter(player => player.name.toLowerCase().includes(query)).map(player => player.team_id) : []);
+    const matches = player => !query || matchingTeamIds.has(player.team_id) || f(player).toLowerCase().includes(query);
     const visible = s.filter(player => matches(player) &&
       (attendance === "all" || (attendance === "arrived" ? player.checked_in : !player.checked_in)));
-    const visibleTeams = n.filter(team => team.name.toLowerCase().includes(query) ||
-      s.some(player => player.team_id === team.id && matches(player)));
+    const visibleTeams = n.filter(team => !query || team.name.toLowerCase().includes(query) || matchingTeamIds.has(team.id));
     // Team actions always affect the whole team, regardless of search or attendance filters.
     r("list").innerHTML = visibleTeams.map(team => {
       const members = visible.filter(player => player.team_id === team.id);
