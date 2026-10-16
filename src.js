@@ -97,6 +97,11 @@ async function ta() {
     const complete = members.length > 0 && members.every(player => player.checked_in);
     return `<button class="${complete ? "" : "green"}" data-check-team="${team.id}" aria-label="${complete ? "Undo Check In All" : "Check In All"} for ${u(team.name)}" ${saving || pending || !members.length ? "disabled" : ""}>${saving ? "Saving…" : complete ? "Undo Check In All" : "Check In All"}</button>`;
   }
+  function showTeamMoveReminder(player) {
+    if (player?.id === 73) {
+      window.alert("Please tell Hunter Sheckells: You have moved to " + f(player) + ". Please join your new team.");
+    }
+  }
   async function checkInTeam(teamId) {
     const team = n.find(team => team.id === teamId);
     const members = s.filter(player => player.team_id === teamId && player.name.trim().toUpperCase() !== "TBD");
@@ -116,6 +121,7 @@ async function ta() {
       await g();
       const updated = s.filter(player => player.team_id === teamId && player.name.trim().toUpperCase() !== "TBD");
       const successful = updated.every(player => player.checked_in === !undo);
+      if (!undo && data?.some(row => row.id === 73)) showTeamMoveReminder(s.find(player => player.id === 73));
       d(successful ? `${team.name}: ${undo ? "team check-in undone" : "all checked in"} (${data?.length || 0} updated).` :
         "Some golfers could not be updated. Refresh and check volunteer access.");
     } catch (error) {
@@ -132,6 +138,7 @@ async function ta() {
         const { data: ne, error: he } = await t.from(b).update({ [T]: O, [j]: O ? (/* @__PURE__ */ new Date()).toISOString() : null }).eq("id", S.id).eq(T, S[T]).select("id");
         if (he) throw he;
         await g(), ne?.length ? d("Saved " + x + ".") : d("This record changed on another device, or your account cannot update it. Check the latest status and try again.");
+        if (b === "golf_players" && T === "checked_in" && O === true && ne?.length) showTeamMoveReminder(s.find(player => player.id === S.id));
       } catch (ne) {
         d("Unable to save " + x + ": " + ne.message);
       } finally {
