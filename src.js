@@ -1,3 +1,4 @@
+import {publicSignup,contactDashboard} from './contacts.js';
 // Recovered from the production golf-pin.js application to preserve deployed purchases and PIN access.
 import { createClient as Zi } from "@supabase/supabase-js";
 async function ta() {
@@ -7,6 +8,8 @@ async function ta() {
     return;
   }
   const t = Zi(e.url, e.publishableKey, { auth: { detectSessionInUrl: true, persistSession: true, autoRefreshToken: true, flowType: "implicit" } });
+  if (new URLSearchParams(location.search).get('updates') === '1') { publicSignup(t); return; }
+  contactDashboard(t);
   let s = [], n = [], i = null, a = null, o = 0, l = Promise.resolve();
   const c = /* @__PURE__ */ new Set(), u = (b) => String(b ?? "").replace(/[&<>"']/g, (S) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[S]), h = (b) => n.find((S) => S.id === b.team_id), f = (b) => h(b)?.name || "Unassigned", d = (b) => {
     r("status").textContent = b;
@@ -274,3 +277,4 @@ async function ta() {
 ta().catch((r) => {
   document.getElementById("status").textContent = "Unable to start check-in: " + r.message;
 });
+
