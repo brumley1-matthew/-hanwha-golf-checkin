@@ -80,6 +80,11 @@ async function ta() {
       const members = visible.filter(player => player.team_id === team.id);
       return members.length ? `<section class="team"><div class="flex space"><strong>${u(team.name)}</strong>${supremeButton(team)}${teamButton(team)}</div>${members.map(y).join("")}</section>` : "";
     }).join("") + visible.filter(player => !h(player)).map(y).join("") || '<p class="muted">No matching golfers.</p>';
+    if (r("list").dataset.summary === "true" && attendance !== "all") {
+      const names = visible.filter(player => player.name.trim().toUpperCase() !== "TBD");
+      r("list").innerHTML = `<h2 style="margin-top:16px">${attendance === "arrived" ? "Arrived" : "Missing"} (${names.length})</h2>` +
+        (names.length ? `<ul style="list-style:none;padding:0;margin:0">${names.map(player => `<li style="padding:12px 0;border-bottom:1px solid #eceef1">${u(player.name)}</li>`).join("")}</ul>` : '<p class="muted">No golfers in this list.</p>');
+    }
     const B = new Set([...r("teamList").querySelectorAll("details[open]")].map((x) => x.dataset.team));
     r("teamList").innerHTML = `<div class="flex" style="margin-bottom:12px"><button type="button" data-add-team>Add New Team (4 TBD)</button><button type="button" data-add-individual>Add Golfer</button></div>` + visibleTeams.map((x) => {
       const ne = s.filter((he) => he.team_id === x.id);
