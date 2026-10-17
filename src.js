@@ -73,7 +73,7 @@ async function ta() {
     const matchingTeamIds = new Set(query ? s.filter(player => player.name.toLowerCase().includes(query)).map(player => player.team_id) : []);
     const matches = player => !query || matchingTeamIds.has(player.team_id) || f(player).toLowerCase().includes(query);
     const visible = s.filter(player => matches(player) &&
-      (attendance === "all" || (attendance === "arrived" ? player.checked_in : !player.checked_in)));
+      (attendance === "all" || (player.name.trim().toUpperCase() !== "TBD" && (attendance === "arrived" ? player.checked_in : !player.checked_in))));
     const visibleTeams = n.filter(team => !query || team.name.toLowerCase().includes(query) || matchingTeamIds.has(team.id));
     // Team actions always affect the whole team, regardless of search or attendance filters.
     r("list").innerHTML = `<div class="flex" style="margin-bottom:12px"><button type="button" data-add-team>Add New Team (4 TBD)</button><button type="button" data-add-individual>Add Golfer</button></div>` + visibleTeams.map(team => {
