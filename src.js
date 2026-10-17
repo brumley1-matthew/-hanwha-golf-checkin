@@ -13,7 +13,7 @@ async function ta() {
   }, p = () => g().catch((b) => d("Refresh failed: " + b.message));
   async function g() {
     if (!a) return;
-    const b = ++o, S = a.id, [T, O] = await Promise.all([t.from("golf_teams").select("id,name,supreme_purchased,supreme_purchased_at,supreme_purchased_by").order("id"), t.from("golf_players").select("id,name,team_id,checked_in,checked_in_at,mulligan_purchased,mulligan_purchased_at,putting_purchased,putting_purchased_at,solo_purchased,solo_purchased_at").order("name")]);
+    const b = ++o, S = a.id, [T, O] = await Promise.all([t.from("golf_teams").select("id,name,supreme_purchased,supreme_purchased_at,supreme_purchased_by").order("id"), t.from("golf_players").select("id,name,team_id,checked_in,checked_in_at,mulligan_purchased,mulligan_purchased_at,putting_purchased,putting_purchased_at,solo_purchased,solo_purchased_at,extra_raffle_tickets").order("name")]);
     if (!(b !== o || a?.id !== S)) {
       if (T.error || O.error) throw T.error || O.error;
       n = T.data, s = O.data, d(s.length ? "Connected \xB7 Attendance and purchases synchronized" : "No roster is visible. Ask the organizer to approve your volunteer account."), v();
@@ -61,6 +61,7 @@ async function ta() {
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-mulligan="${b.id}" aria-label="Mulligan $10 for ${u(b.name)}" ${b.mulligan_purchased || included ? "checked" : ""} ${included || O || soloSaving ? "disabled" : ""}><span>${included ? "Mulligan $10 \xB7 included in " + (T ? "Supreme" : "Solo") : "Mulligan $10"}</span></label>
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-putting="${b.id}" aria-label="Putting Contest $5 for ${u(b.name)}" ${b.putting_purchased || included ? "checked" : ""} ${included || j || soloSaving ? "disabled" : ""}><span>${included ? "Putting Contest $5 \xB7 included in " + (T ? "Supreme" : "Solo") : "Putting Contest $5"}</span></label>
       <label class="purchase-option ${included ? "included" : ""}"><input type="checkbox" data-solo="${b.id}" aria-label="Solo Package $20 for ${u(b.name)}" ${included ? "checked" : ""} ${T || B || soloSaving || O || j ? "disabled" : ""}><span>Solo Package $20<span style="display:block;font-size:11px;font-weight:400;margin-top:3px">2 raffle tickets</span></span></label>
+      <button type="button" data-extra-raffle="${b.id}" ${b.name.trim().toUpperCase() === "TBD" || c.has("raffle:" + b.id) ? "disabled" : ""}>Extra raffle tickets $5 each<span style="display:block;font-size:12px;margin-top:3px">${b.extra_raffle_tickets || 0} tickets · ${(b.extra_raffle_tickets || 0) * 5}</span></button>
       </div></div>`;
   }
   function v() {
@@ -85,6 +86,54 @@ async function ta() {
       return `<details class="team" data-team="${x.id}" ${B.has(String(x.id)) ? "open" : ""}><summary>${u(x.name)} \u2014 ${ne.filter((he) => he.checked_in && he.name.trim().toUpperCase() !== "TBD").length}/${ne.filter((he) => he.name.trim().toUpperCase() !== "TBD").length} arrived${x.supreme_purchased ? " \xB7 Supreme purchased" : ""}</summary><div class="flex space" style="margin-top:10px">${supremeButton(x)}${teamButton(x)}</div>${ne.map(y).join("")}</details>`;
     }).join("") || '<p class="muted">No matching teams.</p>';
   }
+
+  function editExtraRaffle(id) {
+    const player = s.find(x => x.id === id);
+    const key = "raffle:" + id;
+    if (!a || !player || player.name.trim().toUpperCase() === "TBD" || c.has(key) || document.getElementById("extraRaffleDialog")) return;
+    const previous = player.extra_raffle_tickets || 0;
+    const dialog = document.createElement("dialog");
+    dialog.id = "extraRaffleDialog";
+    dialog.setAttribute("aria-labelledby", "extraRaffleTitle");
+    dialog.style.cssText = "width:min(420px,calc(100% - 32px));box-sizing:border-box;border:0;border-radius:14px;padding:24px";
+    dialog.innerHTML = `<form><h2 id="extraRaffleTitle">Extra raffle tickets</h2>
+      <p>${u(player.name)} · $5 each</p>
+      <p class="small muted">Enter the total extra tickets purchased by this golfer. Package tickets are separate.</p>
+      <label for="extraRaffleCount">Total extra tickets</label>
+      <input id="extraRaffleCount" type="number" inputmode="numeric" min="0" max="10000" step="1" required value="${previous}" style="margin-top:8px">
+      <p data-raffle-total role="status">Extra ticket total: ${previous * 5}</p>
+      <p data-raffle-error role="alert"></p>
+      <div class="flex"><button type="submit" class="green">Save tickets</button><button type="button" data-cancel-raffle>Cancel</button></div></form>`;
+    const input = dialog.querySelector("input");
+    input.oninput = () => { dialog.querySelector("[data-raffle-total]").textContent = "Extra ticket total: $" + (Number(input.value) * 5); };
+    dialog.querySelector("[data-cancel-raffle]").onclick = () => dialog.close();
+    dialog.addEventListener("close", () => dialog.remove());
+    dialog.querySelector("form").onsubmit = async event => {
+      event.preventDefault();
+      const count = Number(input.value);
+      if (input.value.trim() === "" || !Number.isSafeInteger(count) || count < 0 || count > 10000 || c.has(key)) return;
+      c.add(key);
+      dialog.querySelectorAll("button,input").forEach(el => el.disabled = true);
+      v(); d("Saving extra raffle tickets…");
+      try {
+        const {data,error} = await t.from("golf_players").update({extra_raffle_tickets:count})
+          .eq("id", id).eq("extra_raffle_tickets", previous).select("id");
+        if (error) throw error;
+        if (!data?.length) throw new Error("Ticket count changed on another device. Cancel and reopen to use the latest count.");
+        await g();
+        dialog.close();
+        d("Saved " + count + " extra raffle tickets for " + player.name + " ($" + count * 5 + ").");
+      } catch (error) {
+        dialog.querySelector("[data-raffle-error]").textContent = error.message;
+        d("Unable to save extra raffle tickets: " + error.message);
+      } finally {
+        c.delete(key); v();
+        dialog.querySelectorAll("button,input").forEach(el => el.disabled = false);
+      }
+    };
+    document.body.append(dialog); dialog.showModal(); input.focus(); input.select();
+  }
+
   function supremeButton(team) {
     const purchased = !!team.supreme_purchased;
     const saving = c.has("supreme:" + team.id);
@@ -243,6 +292,8 @@ async function ta() {
       addRosterSlot(teamId); return;
     }
 
+    const raffleAction = b.target.closest("[data-extra-raffle]");
+    if (raffleAction && !raffleAction.disabled) { editExtraRaffle(Number(raffleAction.dataset.extraRaffle)); return; }
     const editAction = b.target.closest("[data-edit-name]");
     if (editAction) { editGolferName(Number(editAction.dataset.editName)); return; }
     const S = b.target.closest("[data-check]");
@@ -283,9 +334,9 @@ async function ta() {
       if (T) S.checked ? chooseSupremePurchaser(T) : saveSupreme(T, false);
     }
   }), r("search").oninput = v, r("filter").onchange = v, r("export").onclick = () => {
-    const S = [["Name", "Team", "Status", "Checked in at", "Individual mulligan purchased", "Mulligan purchase time", "Supreme Team purchased", "Supreme purchase time", "Mulligan available", "Individual Putting Contest entry", "Putting purchase time", "Putting Contest included", "Solo Package $20 purchased", "Solo purchase time", "Supreme purchased by"], ...s.map((j) => {
+    const S = [["Name", "Team", "Status", "Checked in at", "Individual mulligan purchased", "Mulligan purchase time", "Supreme Team purchased", "Supreme purchase time", "Mulligan available", "Individual Putting Contest entry", "Putting purchase time", "Putting Contest included", "Solo Package $20 purchased", "Solo purchase time", "Supreme purchased by", "Extra raffle tickets", "Extra raffle amount $"], ...s.map((j) => {
       const B = h(j);
-      return [j.name, f(j), j.checked_in ? "Arrived" : "Not arrived", j.checked_in_at || "", j.mulligan_purchased ? "Yes" : "No", j.mulligan_purchased_at || "", B?.supreme_purchased ? "Yes" : "No", B?.supreme_purchased_at || "", j.mulligan_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.putting_purchased ? "Yes" : "No", j.putting_purchased_at || "", j.putting_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.solo_purchased ? "Yes" : "No", j.solo_purchased_at || "", B?.supreme_purchased ? s.find(player => player.id === B.supreme_purchased_by)?.name || "Not recorded" : ""];
+      return [j.name, f(j), j.checked_in ? "Arrived" : "Not arrived", j.checked_in_at || "", j.mulligan_purchased ? "Yes" : "No", j.mulligan_purchased_at || "", B?.supreme_purchased ? "Yes" : "No", B?.supreme_purchased_at || "", j.mulligan_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.putting_purchased ? "Yes" : "No", j.putting_purchased_at || "", j.putting_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.solo_purchased ? "Yes" : "No", j.solo_purchased_at || "", B?.supreme_purchased ? s.find(player => player.id === B.supreme_purchased_by)?.name || "Not recorded" : "", j.extra_raffle_tickets || 0, (j.extra_raffle_tickets || 0) * 5];
     })].map((j) => j.map((B) => '"' + String(B).replace(/"/g, '""') + '"').join(",")).join(`\r
 `), T = document.createElement("a"), O = URL.createObjectURL(new Blob([S], { type: "text/csv;charset=utf-8" }));
     T.href = O, T.download = "hanwha-golf-attendance-purchases.csv", T.click(), setTimeout(() => URL.revokeObjectURL(O), 1e3);
