@@ -13,7 +13,7 @@ async function ta() {
   }, p = () => g().catch((b) => d("Refresh failed: " + b.message));
   async function g() {
     if (!a) return;
-    const b = ++o, S = a.id, [T, O] = await Promise.all([t.from("golf_teams").select("id,name,supreme_purchased,supreme_purchased_at").order("id"), t.from("golf_players").select("id,name,team_id,checked_in,checked_in_at,mulligan_purchased,mulligan_purchased_at,putting_purchased,putting_purchased_at,solo_purchased,solo_purchased_at").order("name")]);
+    const b = ++o, S = a.id, [T, O] = await Promise.all([t.from("golf_teams").select("id,name,supreme_purchased,supreme_purchased_at,supreme_purchased_by").order("id"), t.from("golf_players").select("id,name,team_id,checked_in,checked_in_at,mulligan_purchased,mulligan_purchased_at,putting_purchased,putting_purchased_at,solo_purchased,solo_purchased_at").order("name")]);
     if (!(b !== o || a?.id !== S)) {
       if (T.error || O.error) throw T.error || O.error;
       n = T.data, s = O.data, d(s.length ? "Connected \xB7 Attendance and purchases synchronized" : "No roster is visible. Ask the organizer to approve your volunteer account."), v();
@@ -88,7 +88,64 @@ async function ta() {
   function supremeButton(team) {
     const purchased = !!team.supreme_purchased;
     const saving = c.has("supreme:" + team.id);
-    return `<button type="button" data-supreme-team="${team.id}" class="${purchased ? "" : "green"}" ${saving ? "disabled" : ""}>${saving ? "Saving…" : purchased ? "Undo Supreme Team $80" : "Supreme Team $80"}<span style="display:block;font-size:11px;font-weight:400;margin-top:3px">8 raffle tickets</span></button>`;
+    return `<div><button type="button" data-supreme-team="${team.id}" class="${purchased ? "" : "green"}" ${saving ? "disabled" : ""}>${saving ? "Saving…" : purchased ? "Undo Supreme Team $80" : "Supreme Team $80"}<span style="display:block;font-size:11px;font-weight:400;margin-top:3px">8 raffle tickets</span></button>
+      ${purchased ? `<div class="small" style="margin-top:6px">Purchased by: ${u(s.find(player => player.id === team.supreme_purchased_by)?.name || "Not recorded")} <button type="button" data-supreme-purchaser="${team.id}" ${saving ? "disabled" : ""} style="font-size:12px;padding:4px 8px">Edit purchaser</button></div>` : ""}</div>`;
+  }
+  function chooseSupremePurchaser(team) {
+    if (!a || c.has("supreme:" + team.id) || document.getElementById("supremePurchaserDialog")) return;
+    const members = s.filter(player => player.team_id === team.id && player.name.trim().toUpperCase() !== "TBD");
+    if (!members.length) { d("Add a golfer name before recording a Supreme Team purchase."); return; }
+    const dialog = document.createElement("dialog");
+    dialog.id = "supremePurchaserDialog";
+    dialog.setAttribute("aria-labelledby", "supremePurchaserTitle");
+    dialog.style.cssText = "width:min(420px,calc(100% - 32px));box-sizing:border-box;border:0;border-radius:14px;padding:24px";
+    dialog.innerHTML = `<form>
+      <h2 id="supremePurchaserTitle">Who purchased Supreme Team?</h2>
+      <p>${u(team.name)} · $80 · 8 raffle tickets</p>
+      <label for="supremePurchaser">Purchased by</label>
+      <select id="supremePurchaser" required style="display:block;width:100%;margin:12px 0 20px">
+        <option value="">Select a golfer</option>
+        ${members.map(player => `<option value="${player.id}" ${player.id === team.supreme_purchased_by ? "selected" : ""}>${u(player.name)}</option>`).join("")}
+      </select>
+      <div class="flex"><button type="submit" class="green">Save purchase</button><button type="button" data-cancel-purchaser>Cancel</button></div>
+    </form>`;
+    dialog.querySelector("[data-cancel-purchaser]").onclick = () => dialog.close();
+    dialog.addEventListener("close", () => dialog.remove());
+    dialog.querySelector("form").onsubmit = event => {
+      event.preventDefault();
+      const purchaserId = Number(dialog.querySelector("select").value);
+      if (!members.some(player => player.id === purchaserId)) return;
+      dialog.close();
+      saveSupreme(team, true, purchaserId);
+    };
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+  async function saveSupreme(team, purchased, purchaserId = null) {
+    const key = "supreme:" + team.id;
+    if (!a || c.has(key)) return;
+    if (purchased && !s.some(player => player.id === purchaserId && player.team_id === team.id && player.name.trim().toUpperCase() !== "TBD")) {
+      d("Choose a golfer from this team."); return;
+    }
+    c.add(key); v(); d("Saving Supreme Team purchase…");
+    try {
+      // Save the team purchase and payer together; retain individual purchases.
+      let update = t.from("golf_teams").update({
+        supreme_purchased: purchased,
+        supreme_purchased_at: purchased ? (team.supreme_purchased_at || new Date().toISOString()) : null,
+        supreme_purchased_by: purchased ? purchaserId : null
+      }).eq("id", team.id).eq("supreme_purchased", team.supreme_purchased);
+      update = team.supreme_purchased_by == null
+        ? update.is("supreme_purchased_by", null)
+        : update.eq("supreme_purchased_by", team.supreme_purchased_by);
+      const {data,error} = await update.select("id");
+      if (error) throw error;
+      await g();
+      d(data?.length ? (purchased ? "Saved Supreme Team purchase and purchaser." : "Supreme Team purchase undone.") :
+        "This purchase changed on another device. Check the latest status and try again.");
+    } catch (error) {
+      d("Unable to save Supreme Team purchase: " + error.message);
+    } finally { c.delete(key); v(); }
   }
   function teamButton(team) {
     const members = s.filter(player => player.team_id === team.id && player.name.trim().toUpperCase() !== "TBD");
@@ -196,7 +253,12 @@ async function ta() {
     const supremeAction = b.target.closest("[data-supreme-team]");
     if (supremeAction && !supremeAction.disabled) {
       const team = n.find(x => x.id === Number(supremeAction.dataset.supremeTeam));
-      if (team) k("golf_teams", team, "supreme_purchased", !team.supreme_purchased, "supreme_purchased_at", "supreme:" + team.id, "Supreme Team $80 for " + team.name);
+      if (team) team.supreme_purchased ? saveSupreme(team, false) : chooseSupremePurchaser(team);
+    }
+    const purchaserAction = b.target.closest("[data-supreme-purchaser]");
+    if (purchaserAction && !purchaserAction.disabled) {
+      const team = n.find(x => x.id === Number(purchaserAction.dataset.supremePurchaser));
+      if (team?.supreme_purchased) chooseSupremePurchaser(team);
     }
     const teamAction = b.target.closest("[data-check-team]");
     if (teamAction && !teamAction.disabled) checkInTeam(Number(teamAction.dataset.checkTeam));
@@ -218,12 +280,12 @@ async function ta() {
     }
     if (S.matches("[data-supreme]")) {
       const T = n.find((O) => O.id === Number(S.dataset.supreme));
-      T && k("golf_teams", T, "supreme_purchased", S.checked, "supreme_purchased_at", "supreme:" + T.id, "Supreme purchase for " + T.name);
+      if (T) S.checked ? chooseSupremePurchaser(T) : saveSupreme(T, false);
     }
   }), r("search").oninput = v, r("filter").onchange = v, r("export").onclick = () => {
-    const S = [["Name", "Team", "Status", "Checked in at", "Individual mulligan purchased", "Mulligan purchase time", "Supreme Team purchased", "Supreme purchase time", "Mulligan available", "Individual Putting Contest entry", "Putting purchase time", "Putting Contest included", "Solo Package $20 purchased", "Solo purchase time"], ...s.map((j) => {
+    const S = [["Name", "Team", "Status", "Checked in at", "Individual mulligan purchased", "Mulligan purchase time", "Supreme Team purchased", "Supreme purchase time", "Mulligan available", "Individual Putting Contest entry", "Putting purchase time", "Putting Contest included", "Solo Package $20 purchased", "Solo purchase time", "Supreme purchased by"], ...s.map((j) => {
       const B = h(j);
-      return [j.name, f(j), j.checked_in ? "Arrived" : "Not arrived", j.checked_in_at || "", j.mulligan_purchased ? "Yes" : "No", j.mulligan_purchased_at || "", B?.supreme_purchased ? "Yes" : "No", B?.supreme_purchased_at || "", j.mulligan_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.putting_purchased ? "Yes" : "No", j.putting_purchased_at || "", j.putting_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.solo_purchased ? "Yes" : "No", j.solo_purchased_at || ""];
+      return [j.name, f(j), j.checked_in ? "Arrived" : "Not arrived", j.checked_in_at || "", j.mulligan_purchased ? "Yes" : "No", j.mulligan_purchased_at || "", B?.supreme_purchased ? "Yes" : "No", B?.supreme_purchased_at || "", j.mulligan_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.putting_purchased ? "Yes" : "No", j.putting_purchased_at || "", j.putting_purchased || j.solo_purchased || B?.supreme_purchased ? "Yes" : "No", j.solo_purchased ? "Yes" : "No", j.solo_purchased_at || "", B?.supreme_purchased ? s.find(player => player.id === B.supreme_purchased_by)?.name || "Not recorded" : ""];
     })].map((j) => j.map((B) => '"' + String(B).replace(/"/g, '""') + '"').join(",")).join(`\r
 `), T = document.createElement("a"), O = URL.createObjectURL(new Blob([S], { type: "text/csv;charset=utf-8" }));
     T.href = O, T.download = "hanwha-golf-attendance-purchases.csv", T.click(), setTimeout(() => URL.revokeObjectURL(O), 1e3);
